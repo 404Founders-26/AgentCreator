@@ -1,0 +1,51 @@
+name: reasoning
+title: Reasoning (math word problems)
+description: >
+  Step-by-step reasoning on GSM8K. The teacher's final answer is compared with the
+  ground truth, so only correct reasoning chains are used for training. Thinking
+  traces are kept so the student learns to reason before answering.
+keep_thinking: true
+system_prompt: >
+  You are a careful reasoner. Think through the problem step by step, check your work,
+  and finish with a final line in exactly this form: Answer: <number>
+
+sources:
+  - name: gsm8k
+    type: hf
+    path: openai/gsm8k
+    config: main
+    split: train
+    prompt_field: question
+    answer_field: answer
+    answer_regex: "####\\s*(.+)$"
+    verifier: numeric_answer
+    template: "{prompt}"
+
+eval:
+  name: gsm8k-test
+  type: hf
+  path: openai/gsm8k
+  config: main
+  split: test
+  prompt_field: question
+  answer_field: answer
+  answer_regex: "####\\s*(.+)$"
+  verifier: numeric_answer
+  template: "{prompt}"
+
+# Reasoning traces are long: these values are applied on top of configs/default.yaml
+# when this preset is chosen (your own config file and --set still win).
+config_overrides:
+  teacher:
+    max_tokens: 6144
+    num_ctx: 8192
+  student:
+    max_seq_length: 4096
+  data:
+    max_chars: 24000
+  training:
+    batch_size: 1
+    grad_accum: 16
+  eval:
+    max_new_tokens: 3072
+    batch_size: 2

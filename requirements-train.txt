@@ -1,0 +1,11 @@
+# Training / eval / export (install inside WSL2 with an NVIDIA GPU)
+# 1) PyTorch with CUDA first - pick the command for your CUDA version at https://pytorch.org
+#    e.g. pip install torch --index-url https://download.pytorch.org/whl/cu128
+# 2) Then:
+unsloth                # pulls in a compatible transformers / peft / trl / bitsandbytes
+transformers>=5.0      # Qwen3.5 needs transformers v5
+peft>=0.13
+accelerate>=1.0
+bitsandbytes>=0.43     # 8-bit AdamW (saves VRAM) and optional 4-bit loading
+# Optional: fast GGUF speed test without building llama.cpp
+# llama-cpp-python     # build with CUDA: CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python

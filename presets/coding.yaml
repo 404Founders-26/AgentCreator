@@ -1,0 +1,60 @@
+name: coding
+title: Coding (Python)
+description: >
+  Python problem solving. MBPP problems come with unit tests, so every teacher answer
+  is executed and only passing solutions are kept. CodeAlpaca adds broader instruction
+  following (kept if it contains a code block).
+keep_thinking: false
+system_prompt: >
+  You are an expert software engineer. Solve the task with correct, clean, efficient code.
+  Briefly explain your approach, then give the complete solution in a single ```python code block.
+
+sources:
+  - name: mbpp
+    type: hf
+    path: google-research-datasets/mbpp
+    config: full
+    splits: [train, validation, prompt]
+    prompt_field: text
+    tests_field: test_list
+    setup_field: test_setup_code
+    verifier: python_tests
+    template: |
+      {prompt}
+      Your code must pass these tests:
+      {tests}
+
+  - name: codealpaca
+    type: hf
+    path: sahil2801/CodeAlpaca-20k
+    split: train
+    prompt_field: instruction
+    input_field: input
+    verifier: has_code
+    limit: 3000
+    template: |
+      {prompt}
+      {input}
+
+  # Add your own prompts: one JSON object per line with "prompt" (and optional "tests": [...]).
+  # - name: my_prompts
+  #   type: jsonl
+  #   path: presets/seeds/my_coding_prompts.jsonl
+  #   verifier: python_tests
+
+eval:
+  name: mbpp-test
+  type: hf
+  path: google-research-datasets/mbpp
+  config: full
+  split: test
+  prompt_field: text
+  tests_field: test_list
+  setup_field: test_setup_code
+  verifier: python_tests
+  template: |
+    {prompt}
+    Your code must pass these tests:
+    {tests}
+
+config_overrides: {}

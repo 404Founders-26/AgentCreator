@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentCreator</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">◆</span> AgentCreator <span class="sub">turn a big LLM into a small, fast specialist</span></div>
+  <div class="head-right"><button class="secondary small" id="doctor-btn">System check</button><button class="danger small" id="quit-btn" title="Stop AgentCreator and close its window">Quit</button><div id="gpu" class="gpu">GPU: checking…</div></div>
+</header>
+<section id="doctor" class="doctor hidden"></section>
+
+<main>
+  <!-- ======================= WIZARD ======================= -->
+  <section class="panel" id="wizard">
+    <h2>Create a specialist model</h2>
+
+    <!-- STEP 1: TEACHER -->
+    <div class="step" id="step-teacher">
+      <div class="step-head"><span class="num">1</span><div><h3>Teacher model</h3><p class="hint">The big model whose skill gets distilled. Served by Ollama or any OpenAI-compatible server.</p></div></div>
+      <div class="row">
+        <label class="grow">Server URL <input id="t-url"></label>
+        <button type="button" class="secondary" id="t-connect">Connect</button>
+      </div>
+      <label>Model
+        <select id="t-model"></select>
+      </label>
+      <input id="t-model-custom" class="hidden" placeholder="exact model name on the server, e.g. qwen3.5:9b">
+      <div class="row">
+        <button type="button" class="secondary small" id="t-test">Test speed</button>
+        <span id="t-status" class="hint"></span>
+      </div>
+    </div>
+
+    <!-- STEP 2: STUDENT -->
+    <div class="step" id="step-student">
+      <div class="step-head"><span class="num">2</span><div><h3>Student model</h3><p class="hint">The small model that gets trained. Smaller = more tokens per second.</p></div></div>
+      <div id="s-list" class="choice-list"></div>
+      <input id="s-custom" class="hidden" placeholder="Hugging Face id (org/model) or a local folder path">
+      <label class="check"><input type="checkbox" id="s-4bit"> Train in 4-bit (QLoRA) - only for students that don't fit in 16-bit</label>
+      <div id="s-advice" class="advice"></div>
+    </div>
+
+    <!-- STEP 3: SPECIALTY -->
+    <div class="step" id="step-specialty">
+      <div class="step-head"><span class="num">3</span><div><h3>Specialty</h3><p class="hint">Pick a ready-made one or describe your own - the teacher will write the training tasks.</p></div></div>
+      <div id="sp-tiles" class="tiles"></div>
+      <p id="sp-desc" class="hint"></p>
+
+      <div id="custom-form" class="custom hidden">
+        <h4>New custom specialty</h4>
+        <label>Name <input id="c-title" placeholder="e.g. SQL & database design"></label>
+        <label>What should the student be expert at?
+          <textarea id="c-desc" rows="3" placeholder="e.g. Writing correct, efficient PostgreSQL queries, explaining query plans, designing normalised schemas and fixing slow queries."></textarea>
+        </label>
+        <label>Example requests <span class="opt">(optional, one per line - steers the style)</span>
+          <textarea id="c-examples" rows="3" placeholder="Write a query that returns the top 3 customers by revenue per month&#10;Why is my query with a LEFT JOIN returning duplicates?"></textarea>
+        </label>
+        <div class="row">
+          <label>Answers contain
+            <select id="c-check">
+              <option value="none">Text (explanations, writing, analysis)</option>
+              <option value="has_code">Code (keep only answers with a code block)</option>
+            </select>
+          </label>
+          <label>Tasks the teacher writes
+            <input id="c-num" type="number" min="0" max="20000" step="100" value="1000">
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="c-think"> Keep the teacher's thinking (&lt;think&gt;) traces - for reasoning-heavy specialties</label>
+        <details>
+          <summary>Add your own prompts (optional)</summary>
+          <label>Upload a prompt file <span class="opt">(.txt one per line, .jsonl or .json with a "prompt" field)</span>
+            <input type="file" id="c-file" accept=".txt,.jsonl,.json">
+          </label>
+          <div id="c-file-info" class="hint"></div>
+          <div class="row">
+            <label class="grow">Hugging Face dataset <input id="c-hf" placeholder="org/dataset"></label>
+            <label>Prompt column <input id="c-hf-field" placeholder="prompt"></label>
+          </div>
+        </details>
+        <div class="row">
+          <button type="button" class="secondary" id="c-preview">Preview tasks</button>
+          <button type="button" class="primary-soft" id="c-save">Save specialty</button>
+          <button type="button" class="ghost" id="c-cancel">Cancel</button>
+        </div>
+        <div id="c-msg" class="hint"></div>
+        <ol id="c-preview-list" class="preview"></ol>
+      </div>
+    </div>
+
+    <!-- STEP 4: TRAINING -->
+    <div class="step" id="step-train">
+      <div class="step-head"><span class="num">4</span><div><h3>Training</h3><p class="hint">How much data and training to use.</p></div></div>
+      <div class="seg" id="size">
+        <button type="button" data-size="quick" class="on">Quick test<small>150 tasks · under 1 h</small></button>
+        <button type="button" data-size="standard">Standard<small>all tasks · hours</small></button>
+        <button type="button" data-size="thorough">Thorough<small>2 answers/task · 3 epochs</small></button>
+      </div>
+      <details id="advanced">
+        <summary>Advanced settings</summary>
+        <form id="adv" autocomplete="off">
+          <div class="row">
+            <label>Max tasks used <input name="data.max_prompts" type="number" min="1" placeholder="all"></label>
+            <label>Answers per task <input name="data.samples_per_prompt" type="number" min="1" max="8"></label>
+          </div>
+          <div class="row">
+            <label>Epochs <input name="training.epochs" type="number" min="1"></label>
+            <label>Learning rate <input name="training.learning_rate" type="number" step="0.00001"></label>
+          </div>
+          <div class="row">
+            <label>LoRA rank <input name="training.lora_r" type="number" min="4" step="4"></label>
+            <label>LoRA alpha <input name="training.lora_alpha" type="number" min="4" step="4"></label>
+          </div>
+          <div class="row">
+            <label>Batch size <input name="training.batch_size" type="number" min="1"></label>
+            <label>Grad accumulation <input name="training.grad_accum" type="number" min="1"></label>
+          </div>
+          <div class="row">
+            <label>Max sequence length <input name="student.max_seq_length" type="number" step="256"></label>
+            <label>Thinking traces
+              <select name="data.keep_thinking">
+                <option value="null">Specialty default</option>
+                <option value="true">Keep</option>
+                <option value="false">Drop</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label>Teacher parallel requests <input name="teacher.concurrency" type="number" min="1" max="16"></label>
+            <label>Teacher temperature <input name="teacher.temperature" type="number" step="0.05" min="0" max="2"></label>
+          </div>
+          <div class="row">
+            <label>Eval samples <input name="eval.max_samples" type="number" min="5"></label>
+            <label class="check"><input name="eval.compare_base" type="checkbox"> Compare with untrained student</label>
+          </div>
+          <div class="row">
+            <label>GGUF quant
+              <select name="export.quantization"><option>q4_k_m</option><option>q5_k_m</option><option>q8_0</option><option>f16</option></select>
+            </label>
+            <label>Export with
+              <select name="export.method">
+                <option value="auto">Auto</option><option value="ollama">Ollama import</option>
+                <option value="llama_cpp">llama.cpp folder</option><option value="unsloth">Unsloth GGUF</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label class="grow">llama.cpp folder <input name="export.llama_cpp_dir" placeholder="optional, e.g. C:\tools\llama.cpp"></label>
+          </div>
+          <label>Extra overrides <span class="opt">(key=value per line)</span>
+            <textarea id="overrides" rows="3" placeholder="filter.code_timeout=20&#10;teacher.extra_body={think: true}"></textarea>
+          </label>
+          <div class="stages-pick" id="stages-pick"></div>
+        </form>
+      </details>
+    </div>
+
+    <div class="summary" id="summary"></div>
+    <label>Run name <input id="run-name"></label>
+    <button type="button" class="primary" id="start">Start training</button>
+    <div id="form-msg" class="hint"></div>
+  </section>
+
+  <!-- ======================= RUNS ======================= -->
+  <section class="panel" id="runs-panel">
+    <div class="panel-head">
+      <h2>Runs</h2>
+      <button class="secondary small" id="refresh">Refresh</button>
+    </div>
+    <ul id="runs" class="runs"></ul>
+
+    <div id="detail" class="hidden">
+      <div class="panel-head">
+        <h3 id="d-title"></h3>
+        <div class="actions">
+          <button class="danger small hidden" id="stop">Stop</button>
+          <button class="secondary small" id="resume">Run selected stages</button>
+        </div>
+      </div>
+      <p class="hint" id="d-meta"></p>
+      <ol class="pipeline" id="pipeline"></ol>
+      <div class="cards" id="cards"></div>
+      <div class="chart-wrap hidden" id="loss-wrap">
+        <h4>Training loss</h4>
+        <svg id="loss" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="log">Log</button>
+        <button class="tab" data-tab="samples">Training samples</button>
+        <button class="tab" data-tab="evalout">Eval outputs</button>
+        <button class="tab" data-tab="proc">Process output</button>
+      </div>
+      <pre id="log" class="console tabpane"></pre>
+      <div id="samples" class="tabpane hidden"></div>
+      <div id="evalout" class="tabpane hidden"></div>
+      <pre id="proc" class="console tabpane hidden"></pre>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

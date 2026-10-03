@@ -1,0 +1,78 @@
+# AgentCreator distillation config
+# Every key here can be overridden from the CLI with --set key.path=value
+# or edited in the web UI before starting a run.
+
+project_name: coding-qwen3.5-2b      # run folder name under workdir/
+workdir: runs
+specialty: coding                     # a preset name from presets/ (coding, reasoning, ...)
+seed: 42
+
+teacher:
+  # Any OpenAI-compatible endpoint. Ollama: http://localhost:11434/v1
+  # llama.cpp server: http://localhost:8080/v1
+  base_url: http://localhost:11434/v1
+  model: qwen3.5:9b                   # the exact name your server lists (check with the "Check teacher" button)
+  api_key: ollama
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 3072
+  concurrency: 1                      # parallel requests. 1 is fastest when the teacher barely fits in VRAM;
+                                      # 2-4 helps only if the model fits with room to spare
+  think: null                         # null = only when the specialty keeps thinking traces; true/false forces it
+  num_ctx: 4096                       # Ollama context window - bigger costs VRAM (and pushes the model onto the CPU)
+  timeout: 600
+  retries: 3
+  extra_body: {}                      # passed through to the API, e.g. {think: false}
+
+student:
+  model: Qwen/Qwen3.5-2B              # Hugging Face id or local path. Speed option: Qwen/Qwen3.5-0.8B
+  max_seq_length: 2048
+  load_in_4bit: false                 # bf16 LoRA. Unsloth advises against QLoRA for Qwen3.5 (2B needs ~5 GB in bf16).
+                                      # Set true only for older/bigger students (e.g. Qwen3-4B) that don't fit otherwise.
+
+data:
+  max_prompts: null                   # null = every prompt the preset provides
+  samples_per_prompt: 1               # >1 = rejection sampling: ask N times, keep the verified ones
+  keep_per_prompt: 1                  # how many verified answers to keep for each prompt
+  eval_fraction: 0.03                 # held-out slice of the distilled data (validation loss)
+  min_chars: 20
+  max_chars: 12000
+  keep_thinking: null                 # null = use the preset default; true keeps <think> traces as training targets
+
+filter:
+  execute_code: true                  # run generated code against unit tests (local sandboxed subprocess)
+  code_timeout: 10
+  workers: 4
+
+training:
+  epochs: 2
+  learning_rate: 0.0002
+  batch_size: 2
+  grad_accum: 8
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.0
+  logging_steps: 5
+  resume: true                        # continue from the last checkpoint if one exists
+
+eval:
+  max_samples: 100
+  max_new_tokens: 1024
+  batch_size: 4
+  compare_base: true                  # also score the untouched student so you can see the gain
+  judge_max_tokens: 2048              # custom specialties: the teacher grades answers 1-10
+
+export:
+  method: auto                        # auto | ollama | llama_cpp | unsloth
+                                      # auto: llama_cpp if llama_cpp_dir is set; on Windows Ollama (no compiler needed); else Unsloth
+  quantization: q4_k_m                # q4_k_m, q5_k_m, q8_0, f16 (Ollama import supports q4_k_m, q4_k_s, q8_0, f16)
+  llama_cpp_dir: null                 # path to a llama.cpp checkout/build; null = use Unsloth's GGUF exporter
+  keep_f16: false
+
+benchmark:
+  prompt: "Write a Python function that returns the n-th Fibonacci number iteratively, with a docstring."
+  max_new_tokens: 256
+  runs: 3
+  include_teacher: true               # also time the teacher through its API for a side-by-side number

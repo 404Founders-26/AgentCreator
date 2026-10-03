@@ -1,0 +1,60 @@
+name: coding_demo
+title: "Coding (fast demo)"
+description: >
+  The quickest complete run, made for demos. Uses only MBPP Python problems, which have short answers
+  and unit tests, so every teacher answer is checked by running it. Answers are kept short, about
+  150 tasks are used, and the student is scored on 50 held-out MBPP test problems before and after
+  training. The whole pipeline runs end to end in well under an hour on an 8 GB GPU.
+keep_thinking: false
+system_prompt: >
+  You are an expert Python programmer. Reply with one short sentence explaining the idea, then the
+  complete solution in a single ```python code block. No tests, no extra commentary.
+
+sources:
+  - name: mbpp
+    type: hf
+    path: google-research-datasets/mbpp
+    config: full
+    splits: [train, validation, prompt]
+    prompt_field: text
+    tests_field: test_list
+    setup_field: test_setup_code
+    verifier: python_tests
+    template: |
+      {prompt}
+      Your code must pass these tests:
+      {tests}
+
+eval:
+  name: mbpp-test
+  type: hf
+  path: google-research-datasets/mbpp
+  config: full
+  split: test
+  prompt_field: text
+  tests_field: test_list
+  setup_field: test_setup_code
+  verifier: python_tests
+  template: |
+    {prompt}
+    Your code must pass these tests:
+    {tests}
+
+# Applied when this specialty is chosen (the UI's "Quick test" size uses the same numbers)
+config_overrides:
+  teacher:
+    max_tokens: 1024
+    num_ctx: 4096
+    concurrency: 1
+  data:
+    max_prompts: 150
+  training:
+    epochs: 2
+    batch_size: 4
+    grad_accum: 4
+  eval:
+    max_samples: 50
+    max_new_tokens: 512
+    batch_size: 8
+  benchmark:
+    runs: 2

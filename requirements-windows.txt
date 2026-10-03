@@ -1,0 +1,5 @@
+# Training / eval packages for native Windows (setup_windows.bat installs torch + unsloth separately first)
+transformers>=5.0      # Qwen3.5 needs transformers v5
+peft>=0.13
+accelerate>=1.0
+bitsandbytes>=0.45     # has official Windows wheels; used for 8-bit AdamW

@@ -1,0 +1,6 @@
+# Core: data generation, filtering, CLI and web UI
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+pyyaml>=6.0
+datasets>=2.19
