@@ -179,6 +179,15 @@ It appears in the UI automatically.
 pip install pytest && python -m pytest -q tests     # no GPU or internet needed (uses a fake teacher)
 ```
 
+## Online demo (Vercel)
+
+`site/` is a static, read-only copy of the UI that replays a real run (`site/demo-data.json`).
+Training can't run on Vercel (it needs your GPU and Ollama), so the demo shows results only.
+
+Deploy: in Vercel, **Add New -> Project -> import `404Founders-26/AgentCreator`**, set **Root Directory**
+to `site`, set Framework Preset to **Other**, leave the build command empty, and click **Deploy**.
+Every push to `main` redeploys automatically.
+
 ## Safety note
 
 The filter stage **executes code written by the teacher model** to check it against unit tests.
